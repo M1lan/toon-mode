@@ -2,6 +2,8 @@
 
 ## Project Structure & Module Organization
 - `toon-mode.el`: Emacs major mode implementation (syntax table, font-lock, indentation).
+- `test/toon-mode-tests.el`: ERT test suite.
+- `Makefile`: Convenience target for running tests.
 - `TOON-SPEC.md`: Local copy of the TOON v3.0 specification used as reference.
 - `readme.org`: Short project overview and upstream links.
 - `elisp.info.gz`: Emacs Lisp reference manual snapshot.
@@ -10,6 +12,7 @@
 This repo is a single Emacs Lisp file; there is no build pipeline.
 - Load in Emacs (manual smoke test): `M-x load-file` -> `toon-mode.el`.
 - Batch load check: `emacs -Q --batch -l toon-mode.el` (exits non-zero if load fails).
+- Run tests: `make test`.
 - Try the mode: open a `.toon` file and verify indentation and highlighting.
 
 ## Coding Style & Naming Conventions
@@ -19,7 +22,7 @@ This repo is a single Emacs Lisp file; there is no build pipeline.
 - Avoid non-ASCII unless required by the TOON spec or Emacs conventions.
 
 ## Testing Guidelines
-- No automated test suite is present.
+- Automated tests live in `test/toon-mode-tests.el` and run via `make test`.
 - Validate changes manually:
   - Load the mode in Emacs.
   - Confirm `.toon` file indentation updates via `TAB`.

@@ -2,6 +2,14 @@
 
 * major mode for "toon"
 
+#+BEGIN_QUOTE
+Token-Oriented Object Notation is a compact, human-readable encoding of the
+JSON data model that minimizes tokens and makes structure easy for models to
+follow.  It's intended for LLM input as a drop-in, lossless representation of
+your existing JSON.
+#+END_QUOTE
+
+
 toon: https://toonformat.dev/
 
 toon spec is here:
@@ -22,6 +30,12 @@ https://www.gnu.org/software/emacs/manual/elisp.html
 - indent with TAB
 - convert to json: M-x toon-convert-buffer-to-json (C-c C-j)
 - pretty-print: M-x toon-format-buffer (C-c C-f)
+- show path at point: M-x toon-mode-show-path (C-c C-p)
+- copy path at point: M-x toon-mode-kill-path (C-c C-y)
+- toggle boolean: M-x toon-toggle-boolean (C-c C-t)
+- replace value with null: M-x toon-nullify-value (C-c C-k)
+- increment number: M-x toon-increment-number-at-point (C-c C-i)
+- decrement number: M-x toon-decrement-number-at-point (C-c C-d)
 
 * current features
 
@@ -29,11 +43,4 @@ https://www.gnu.org/software/emacs/manual/elisp.html
 - indentation based on block structure
 - convert TOON buffer to JSON via the `toon` CLI
 - pretty-print buffers (pure Emacs Lisp; no external dependencies)
-
-
-#+BEGIN_QUOTE
-Token-Oriented Object Notation is a compact, human-readable encoding of the
-JSON data model that minimizes tokens and makes structure easy for models to
-follow.  It's intended for LLM input as a drop-in, lossless representation of
-your existing JSON.
-#+END_QUOTE
+- path helpers and value toggles (boolean/null/number)

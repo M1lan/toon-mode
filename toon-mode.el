@@ -820,6 +820,12 @@ With prefix arg REPLACE, replace buffer contents."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-j") #'toon-convert-buffer-to-json)
     (define-key map (kbd "C-c C-f") #'toon-format-buffer)
+    (define-key map (kbd "C-c C-p") #'toon-mode-show-path)
+    (define-key map (kbd "C-c C-y") #'toon-mode-kill-path)
+    (define-key map (kbd "C-c C-t") #'toon-toggle-boolean)
+    (define-key map (kbd "C-c C-k") #'toon-nullify-value)
+    (define-key map (kbd "C-c C-i") #'toon-increment-number-at-point)
+    (define-key map (kbd "C-c C-d") #'toon-decrement-number-at-point)
     map)
   "Keymap for `toon-mode'.")
 
