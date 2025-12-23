@@ -8,6 +8,26 @@ toon spec is here: https://raw.githubusercontent.com/toon-format/spec/refs/heads
 
 elisp reference manual is here: https://www.gnu.org/software/emacs/manual/elisp.html
 
+* requirements
+
+- Emacs 27+ (for reliable `font-lock-ensure`)
+- `toon` CLI in your PATH (for TOON -> JSON conversion)
+
+* usage
+
+- load the mode: M-x load-file RET toon-mode.el
+- open a .toon file (auto-mode)
+- indent with TAB
+- convert to json: M-x toon-convert-buffer-to-json (C-c C-j)
+- pretty-print: M-x toon-format-buffer (C-c C-f)
+
+* current features
+
+- syntax highlighting for keys, constants, and numbers
+- indentation based on block structure
+- convert TOON buffer to JSON via the `toon` CLI
+- pretty-print buffers via the `toon` CLI
+
 
 #+BEGIN_QUOTE
 Token-Oriented Object Notation is a compact, human-readable encoding of the
