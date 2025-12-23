@@ -54,3 +54,11 @@
          (input "root:\n  key: 1\n")
          (formatted (toon--format-string input)))
     (should (equal formatted "root:\n    key: 1\n"))))
+
+(ert-deftest toon-mode-keybindings ()
+  (with-temp-buffer
+    (toon-mode)
+    (should (eq (lookup-key toon-mode-map (kbd "C-c C-j"))
+                'toon-convert-buffer-to-json))
+    (should (eq (lookup-key toon-mode-map (kbd "C-c C-f"))
+                'toon-format-buffer))))

@@ -158,6 +158,13 @@ With prefix arg REPLACE, replace buffer contents."
     (erase-buffer)
     (insert formatted)))
 
+(defvar toon-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-j") #'toon-convert-buffer-to-json)
+    (define-key map (kbd "C-c C-f") #'toon-format-buffer)
+    map)
+  "Keymap for `toon-mode'.")
+
 ;;;###autoload
 (define-derived-mode toon-mode prog-mode "TOON"
   "Major mode for editing TOON files."
