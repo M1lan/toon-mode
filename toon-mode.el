@@ -428,6 +428,344 @@ Return (TOKEN . END) or nil."
             (setq out-lines (cons (concat indent formatted) out-lines))))))
     (mapconcat #'identity (nreverse out-lines) "\n")))
 
+(defun toon--in-string-p ()
+  "Return non-nil if point is inside a string."
+  (nth 3 (syntax-ppss)))
+
+(defun toon--bounds-of-string-at-point ()
+  "Return bounds of string at point, or nil."
+  (let ((state (syntax-ppss)))
+    (when (nth 3 state)
+      (let ((start (nth 8 state)))
+        (save-excursion
+          (goto-char start)
+          (forward-sexp)
+          (cons start (point)))))))
+
+(defun toon--number-bounds-at-point ()
+  "Return bounds of number at point, or nil."
+  (save-excursion
+    (when (and (not (toon--in-string-p))
+               (or (looking-at-p "[0-9]")
+                   (looking-at-p "-")
+                   (looking-back "[0-9]" (line-beginning-position))))
+      (let ((end (progn
+                   (skip-chars-forward "-0-9eE+.")
+                   (point)))
+            (start (progn
+                     (skip-chars-backward "-0-9eE+.")
+                     (point))))
+        (when (save-excursion
+                (goto-char start)
+                (looking-at
+                 "\\_<-?[0-9]+\\(?:\\.[0-9]+\\)?\\(?:[eE][+-]?[0-9]+\\)?\\_>"))
+          (cons start end))))))
+
+(defun toon--key-token-identifier-p (token)
+  "Return non-nil if TOKEN is an unquoted identifier key."
+  (and token
+       (not (string-prefix-p "\"" token))
+       (string-match-p "\\`[A-Za-z_][A-Za-z0-9_.]*\\'" token)))
+
+(defun toon--unescape-quoted (token)
+  "Unescape a quoted TOKEN and return the inner string."
+  (let ((s (substring token 1 -1)))
+    (setq s (replace-regexp-in-string "\\\\\"" "\"" s))
+    (setq s (replace-regexp-in-string "\\\\\\\\" "\\\\" s))
+    (setq s (replace-regexp-in-string "\\\\n" "\n" s))
+    (setq s (replace-regexp-in-string "\\\\r" "\r" s))
+    (setq s (replace-regexp-in-string "\\\\t" "\t" s))
+    s))
+
+(defun toon--escape-for-path (s)
+  "Escape S for use inside a quoted path segment."
+  (let ((out s))
+    (setq out (replace-regexp-in-string "\\\\" "\\\\\\\\" out))
+    (setq out (replace-regexp-in-string "\"" "\\\\\"" out))
+    out))
+
+(defun toon--path-append-key (path token)
+  "Append key TOKEN to PATH."
+  (if (toon--key-token-identifier-p token)
+      (concat path "." token)
+    (let* ((raw (if (string-prefix-p "\"" token)
+                    (toon--unescape-quoted token)
+                  token))
+           (escaped (toon--escape-for-path raw)))
+      (concat path "[\"" escaped "\"]"))))
+
+(defun toon--path-from-stack (stack)
+  "Build a path string from STACK."
+  (let ((path "$"))
+    (dolist (frame (nreverse stack) path)
+      (pcase (plist-get frame :type)
+        ('item
+         (setq path (concat path "[" (number-to-string (plist-get frame :index)) "]")))
+        ((or 'object 'array 'tabular)
+         (let ((key (plist-get frame :key)))
+           (when key
+             (setq path (toon--path-append-key path key)))))))))
+
+(defun toon--count-delims-before (s delim pos)
+  "Count unquoted DELIM occurrences before POS in S."
+  (let ((i 0)
+        (count 0)
+        (len (length s))
+        (in-string nil)
+        (escaped nil))
+    (while (< i (min pos len))
+      (let ((ch (aref s i)))
+        (cond
+         ((and (not in-string) (= ch ?\"))
+          (setq in-string t))
+         ((and in-string (not escaped) (= ch ?\\))
+          (setq escaped t))
+         ((and in-string (not escaped) (= ch ?\"))
+          (setq in-string nil))
+         ((and in-string escaped)
+          (setq escaped nil))
+         ((and (not in-string) (= ch delim))
+          (setq count (1+ count)))))
+      (setq i (1+ i)))
+    count))
+
+(defun toon--find-tabular-frame (stack depth)
+  "Return the nearest tabular frame matching DEPTH, or nil."
+  (let ((frames stack)
+        (match nil))
+    (while (and frames (not match))
+      (let ((frame (car frames)))
+        (when (and (eq (plist-get frame :type) 'tabular)
+                   (= (plist-get frame :row-depth) depth))
+          (setq match frame)))
+      (setq frames (cdr frames)))
+    match))
+
+(defun toon--update-first-frame (stack pred fn)
+  "Update first frame in STACK matching PRED with FN."
+  (cond
+   ((null stack) nil)
+   ((funcall pred (car stack))
+    (cons (funcall fn (car stack)) (cdr stack)))
+   (t (cons (car stack)
+            (toon--update-first-frame (cdr stack) pred fn)))))
+
+(defun toon--find-array-frame (stack)
+  "Return nearest array frame from STACK."
+  (let ((frames stack)
+        (match nil))
+    (while (and frames (not match))
+      (let ((frame (car frames)))
+        (when (eq (plist-get frame :type) 'array)
+          (setq match frame)))
+      (setq frames (cdr frames)))
+    match))
+
+(defun toon--path-at-point ()
+  "Return TOON path at point, or nil."
+  (save-excursion
+    (let* ((target-pos (point))
+           (target-line (line-number-at-pos))
+           (indent-size toon-indent-offset)
+           (stack '())
+           (line-num 1)
+           (path nil))
+      (goto-char (point-min))
+      (while (and (not path) (<= line-num target-line))
+        (let* ((bol (line-beginning-position))
+               (eol (line-end-position))
+               (line (buffer-substring-no-properties bol eol))
+               (line (toon--string-trim-right line))
+               (split (toon--count-leading-spaces line))
+               (spaces (car split))
+               (content (cdr split)))
+          (when (and indent-size (> indent-size 0) (/= 0 (mod spaces indent-size)))
+            (setq spaces (* (floor (/ (float spaces) indent-size)) indent-size)))
+          (let ((depth (if (and indent-size (> indent-size 0))
+                           (/ spaces indent-size)
+                         0)))
+            (while (and stack (>= (plist-get (car stack) :depth) depth))
+              (setq stack (cdr stack)))
+            (unless (toon--string-empty-p (toon--string-trim content))
+              (let* ((trimmed (toon--string-trim content))
+                     (is-target (= line-num target-line))
+                     (col (if is-target (- target-pos bol) 0))
+                     (content-col (max 0 (- col spaces))))
+                (cond
+                 ;; List item
+                 ((or (string= trimmed "-") (string-prefix-p "- " trimmed))
+                  (let* ((after (toon--string-trim-left (substring trimmed 1)))
+                         (hdr (and (not (toon--string-empty-p after))
+                                   (toon--parse-header after)))
+                         (kv (and (not hdr) (toon--parse-key-value after)))
+                         (array-frame (toon--find-array-frame stack))
+                         (idx (or (and array-frame (plist-get array-frame :index)) 0)))
+                    (when is-target
+                      (setq path (toon--path-from-stack stack))
+                      (setq path (concat path "[" (number-to-string idx) "]"))
+                      (when (and kv (car kv))
+                        (setq path (toon--path-append-key path (car kv))))
+                      (when (and hdr (plist-get hdr :key))
+                        (setq path (toon--path-append-key path (plist-get hdr :key)))))
+                    (when array-frame
+                      (setq stack (toon--update-first-frame
+                                   stack
+                                   (lambda (f) (eq f array-frame))
+                                   (lambda (f)
+                                     (plist-put f :index (1+ idx))))))
+                    (setq stack (cons (list :type 'item :depth depth :index idx) stack))
+                    (when (and kv (toon--string-empty-p (toon--string-trim (cdr kv))))
+                      (setq stack (cons (list :type 'object :depth depth :key (car kv)) stack)))
+                    (when hdr
+                      (let* ((tabular (plist-get hdr :fields))
+                             (row-depth (if tabular (+ depth 2) (+ depth 1)))
+                             (frame (list :type (if tabular 'tabular 'array)
+                                          :depth depth
+                                          :key (plist-get hdr :key)
+                                          :index 0
+                                          :delim (plist-get hdr :delim)
+                                          :fields (plist-get hdr :fields)
+                                          :row-depth row-depth)))
+                        (setq stack (cons frame stack))))))
+                 ;; Header line
+                 ((let ((hdr (toon--parse-header trimmed)))
+                    (when hdr
+                      (when is-target
+                        (setq path (toon--path-from-stack stack))
+                        (when (plist-get hdr :key)
+                          (setq path (toon--path-append-key path (plist-get hdr :key)))))
+                      (let* ((tabular (plist-get hdr :fields))
+                             (frame (list :type (if tabular 'tabular 'array)
+                                          :depth depth
+                                          :key (plist-get hdr :key)
+                                          :index 0
+                                          :delim (plist-get hdr :delim)
+                                          :fields (plist-get hdr :fields)
+                                          :row-depth (+ depth 1))))
+                        (setq stack (cons frame stack)))
+                      t)))
+                 ;; Key/value line
+                 ((let ((kv (toon--parse-key-value trimmed)))
+                    (when kv
+                      (when is-target
+                        (setq path (toon--path-from-stack stack))
+                        (setq path (toon--path-append-key path (car kv))))
+                      (when (toon--string-empty-p (toon--string-trim (cdr kv)))
+                        (setq stack (cons (list :type 'object :depth depth :key (car kv)) stack)))
+                      t)))
+                 ;; Tabular row
+                 ((let ((tab (toon--find-tabular-frame stack depth)))
+                    (when tab
+                      (let ((idx (or (plist-get tab :index) 0)))
+                        (when is-target
+                          (setq path (toon--path-from-stack stack))
+                          (setq path (concat path "[" (number-to-string idx) "]"))
+                          (let* ((fields (plist-get tab :fields))
+                                 (delim (plist-get tab :delim))
+                                 (field-index (toon--count-delims-before trimmed delim content-col)))
+                            (when (and fields (< field-index (length fields)))
+                              (setq path (toon--path-append-key path (nth field-index fields))))))
+                        (setq stack (toon--update-first-frame
+                                     stack
+                                     (lambda (f) (eq f tab))
+                                     (lambda (f)
+                                       (plist-put f :index (1+ idx))))))
+                      t)))
+                 (t nil))))))
+        (forward-line 1)
+        (setq line-num (1+ line-num)))
+      path)))
+
+(defun toon-mode-show-path ()
+  "Print the path to the node at point in the minibuffer."
+  (interactive)
+  (let ((path (toon--path-at-point)))
+    (if path
+        (message "%s" path)
+      (message "No TOON path found at point."))))
+
+(defun toon-mode-kill-path ()
+  "Save the path to the node at point to the kill ring."
+  (interactive)
+  (let ((path (toon--path-at-point)))
+    (if path
+        (progn
+          (kill-new path)
+          (message "%s" path))
+      (message "No TOON path found at point."))))
+
+(defun toon-toggle-boolean ()
+  "If point is on `true' or `false', toggle it."
+  (interactive)
+  (unless (toon--in-string-p)
+    (let* ((bounds (bounds-of-thing-at-point 'symbol))
+           (string (and bounds (buffer-substring-no-properties (car bounds) (cdr bounds))))
+           (pt (point)))
+      (when (and bounds (member string '("true" "false")))
+        (delete-region (car bounds) (cdr bounds))
+        (if (string= "true" string)
+            (insert "false")
+          (insert "true"))
+        (goto-char (min (point-max) (max (point-min) pt)))))))
+
+(defun toon-nullify-value ()
+  "Replace the value at point with `null'."
+  (interactive)
+  (let* ((bol (line-beginning-position))
+         (eol (line-end-position))
+         (line (buffer-substring-no-properties bol eol))
+         (split (toon--count-leading-spaces (toon--string-trim-right line)))
+         (spaces (car split))
+         (content (cdr split))
+         (trimmed (toon--string-trim content)))
+    (cond
+     ;; Key/value line: replace value (or insert) regardless of point.
+     ((let ((kv (toon--parse-key-value trimmed)))
+        (when kv
+          (let ((colon-pos (toon--find-unquoted-char trimmed ?:)))
+            (when colon-pos
+              (goto-char (+ bol spaces (1+ colon-pos)))
+              (delete-region (point) (+ bol spaces (length trimmed)))
+              (insert " null")
+              t)))))
+     ;; List item with primitive value.
+     ((or (string= trimmed "-") (string-prefix-p "- " trimmed))
+      (let ((after (toon--string-trim-left (substring trimmed 1))))
+        (when (and (not (toon--string-empty-p after))
+                   (not (toon--parse-header after))
+                   (not (toon--parse-key-value after)))
+          (goto-char (+ bol spaces))
+          (delete-region (point) (+ bol spaces (length trimmed)))
+          (insert "- null")
+          t)))
+     ;; Fallback: replace token/number/string at point.
+     (t
+      (let ((bounds (or (toon--bounds-of-string-at-point)
+                        (toon--number-bounds-at-point)
+                        (bounds-of-thing-at-point 'symbol))))
+        (when bounds
+          (delete-region (car bounds) (cdr bounds))
+          (insert "null")))))))
+
+(defun toon-increment-number-at-point (&optional delta)
+  "Add DELTA to the number at point; DELTA defaults to 1."
+  (interactive "P")
+  (let ((bounds (toon--number-bounds-at-point)))
+    (when bounds
+      (let* ((num (string-to-number
+                   (buffer-substring-no-properties (car bounds) (cdr bounds))))
+             (delta (or delta 1))
+             (new (number-to-string (+ num delta)))
+             (pt (point)))
+        (delete-region (car bounds) (cdr bounds))
+        (insert new)
+        (goto-char (min (point-max) pt))))))
+
+(defun toon-decrement-number-at-point (&optional delta)
+  "Subtract DELTA from the number at point; DELTA defaults to 1."
+  (interactive "P")
+  (toon-increment-number-at-point (- (or delta 1))))
+
 (defun toon--call-cli (input &rest args)
   "Run the TOON CLI with ARGS on INPUT and return stdout as a string."
   (let ((program (toon--ensure-cli))
