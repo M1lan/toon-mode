@@ -47,3 +47,10 @@
          (json-text (toon--call-cli "a: 1\n" "--decode"))
          (data (json-read-from-string json-text)))
     (should (equal (alist-get 'a data) 1))))
+
+(ert-deftest toon-cli-format-buffer ()
+  (skip-unless (executable-find "toon"))
+  (let* ((toon-indent-offset 4)
+         (input "root:\n  key: 1\n")
+         (formatted (toon--format-string input)))
+    (should (equal formatted "root:\n    key: 1\n"))))

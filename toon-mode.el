@@ -145,6 +145,19 @@ With prefix arg REPLACE, replace buffer contents."
             (json-mode)))
         (display-buffer buf)))))
 
+(defun toon--format-string (input)
+  "Format TOON INPUT by round-tripping through the TOON CLI."
+  (let* ((json-text (toon--call-cli input "--decode"))
+         (indent (number-to-string toon-indent-offset)))
+    (toon--call-cli json-text "--encode" "--indent" indent)))
+
+(defun toon-format-buffer ()
+  "Pretty-print the current buffer as canonical TOON."
+  (interactive)
+  (let ((formatted (toon--format-string (buffer-string))))
+    (erase-buffer)
+    (insert formatted)))
+
 ;;;###autoload
 (define-derived-mode toon-mode prog-mode "TOON"
   "Major mode for editing TOON files."
