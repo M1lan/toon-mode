@@ -1,14 +1,14 @@
 ;;; toon-mode.el --- Major mode for editing TOON files -*- lexical-binding: t; -*-
 
-;; Author: Gemini
+;; Author: Milan Santosi
 ;; Version: 1.0.0
 ;; Keywords: data, languages
-;; URL: https://github.com/toon-format/spec
+;; URL: https://github.com/m1lan/toon-mode
 
 ;;; Commentary:
 
-;; This mode provides syntax highlighting and indentation for TOON (Token-Oriented Object Notation) files.
-;; Based on TOON Specification v3.0.
+;; This mode provides syntax highlighting and indentation for TOON
+;; (Token-Oriented Object Notation) files, based on TOON Specification v3.0.
 
 ;;; Code:
 
@@ -34,7 +34,7 @@
     ;; Strings
     (modify-syntax-entry ?\" "\"" table)
     (modify-syntax-entry ?\\ "\\" table)
-    
+
     ;; Punctuation
     (modify-syntax-entry ?: "." table)
     (modify-syntax-entry ?\[ "(" table)
@@ -42,7 +42,7 @@
     (modify-syntax-entry ?\{ "(" table)
     (modify-syntax-entry ?\} ")" table)
     (modify-syntax-entry ?- "." table)
-    
+
     table)
   "Syntax table for `toon-mode'.")
 
@@ -59,7 +59,7 @@
      ;; Field list {a,b,c}
      '("{\\([^}]*\\)}" 1 font-lock-string-face)
      ;; Object keys (unquoted)
-     `(,(concat "^\\s-*\\(" toon--identifier-rx "\\)\\s-*:") 
+     `(,(concat "^\\s-*\\(" toon--identifier-rx "\\)\\s-*:")
        1 font-lock-variable-name-face)
      ;; Object keys (quoted)
      '("^\\s-*\\(\"[^\"]+\"\\)\\s-*:"
