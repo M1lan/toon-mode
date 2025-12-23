@@ -25,8 +25,8 @@
 (defvar toon-mode-syntax-table
   (let ((table (make-syntax-table)))
     ;; Strings
-    (modify-syntax-entry ?" "" table)
-    (modify-syntax-entry ?\ \\ table)
+    (modify-syntax-entry ?\" "\"" table)
+    (modify-syntax-entry ?\\ "\\" table)
     
     ;; Punctuation
     (modify-syntax-entry ?: "." table)
@@ -76,24 +76,29 @@
 
 ;; Indentation Logic
 
+(defun toon--line-opens-block-p (line)
+  "Return non-nil if LINE opens a nested block."
+  (string-match-p ":\\s-*$" line))
+
 (defun toon-calculate-indentation ()
   "Return the suggested indentation for the current line."
   (save-excursion
     (beginning-of-line)
     (if (bobp)
         0
-      (let ((current-line-is-empty (looking-at-p "^\s-*$")))
-        (forward-line -1)
-        ;; Skip empty lines to find previous non-empty line
-        (while (and (not (bobp)) (looking-at-p "^\s-*$"))
-          (forward-line -1))
-        (if (looking-at-p "^\s-*$")
-            0
-          (let ((prev-indent (current-indentation))
-                (prev-line-ends-colon (looking-at-p ".*:\s-*$")))
-            (if prev-line-ends-colon
-                (+ prev-indent toon-indent-offset)
-              prev-indent)))))))
+      (forward-line -1)
+      ;; Skip empty lines to find previous non-empty line
+      (while (and (not (bobp)) (looking-at-p "^\\s-*$"))
+        (forward-line -1))
+      (if (looking-at-p "^\\s-*$")
+          0
+        (let ((prev-indent (current-indentation))
+              (prev-line (buffer-substring-no-properties
+                          (line-beginning-position)
+                          (line-end-position))))
+          (if (toon--line-opens-block-p prev-line)
+              (+ prev-indent toon-indent-offset)
+            prev-indent))))))
 
 (defun toon-indent-line ()
   "Indent current line as TOON code."
