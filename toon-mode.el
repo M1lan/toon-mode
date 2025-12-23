@@ -114,19 +114,52 @@
   (or (executable-find toon-cli-command)
       (user-error "TOON CLI not found. Customize `toon-cli-command'")))
 
+(defun toon--read-file-string (path)
+  "Return PATH contents as a string, or an empty string if missing."
+  (if (and path (file-exists-p path))
+      (with-temp-buffer
+        (insert-file-contents path)
+        (buffer-string))
+    ""))
+
+(defun toon--display-cli-error (program args exit-code stdout stderr)
+  "Show a buffer with CLI failure details."
+  (let ((buf (get-buffer-create "*TOON CLI Error*")))
+    (with-current-buffer buf
+      (setq buffer-read-only nil)
+      (erase-buffer)
+      (insert "Program: " program "\n")
+      (insert "Args: " (mapconcat #'identity args " ") "\n")
+      (insert "Exit: " (format "%s" exit-code) "\n\n")
+      (when (and (stringp stderr) (> (length stderr) 0))
+        (insert "stderr:\n" stderr "\n"))
+      (when (and (stringp stdout) (> (length stdout) 0))
+        (insert "stdout:\n" stdout "\n"))
+      (setq buffer-read-only t)
+      (goto-char (point-min)))
+    (display-buffer buf)))
+
 (defun toon--call-cli (input &rest args)
   "Run the TOON CLI with ARGS on INPUT and return stdout as a string."
-  (let ((program (toon--ensure-cli)))
-    (with-temp-buffer
-      (insert input)
-      (let ((exit-code (apply #'call-process-region
-                              (point-min) (point-max)
-                              program
-                              t t nil
-                              args)))
-        (if (zerop exit-code)
-            (buffer-string)
-          (error "TOON CLI failed (%s)" exit-code))))))
+  (let ((program (toon--ensure-cli))
+        (err-file (make-temp-file "toon-cli-stderr-")))
+    (unwind-protect
+        (with-temp-buffer
+          (insert input)
+          (let* ((exit-code (apply #'call-process-region
+                                   (point-min) (point-max)
+                                   program
+                                   t (list t err-file) nil
+                                   args))
+                 (stdout (buffer-string))
+                 (stderr (toon--read-file-string err-file)))
+            (if (eq exit-code 0)
+                stdout
+              (toon--display-cli-error program args exit-code stdout stderr)
+              (error "TOON CLI failed (%s). See *TOON CLI Error* for details."
+                     exit-code))))
+      (when (and err-file (file-exists-p err-file))
+        (delete-file err-file)))))
 
 (defun toon-convert-buffer-to-json (&optional replace)
   "Convert current buffer from TOON to JSON using the TOON CLI.
