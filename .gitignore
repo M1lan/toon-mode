@@ -1,5 +1,7 @@
-.rumdl_cache/
-.worktrees/
-elisp.info.gz
-
-TOON-SPEC.md
+*
+!readme.org
+!Makefile
+!toon-mode.el
+!AGENTS.md
+!CLAUDE.md
+!GEMINI.md
