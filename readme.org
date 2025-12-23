@@ -1,0 +1,17 @@
+~a simple toon mode for emacs~
+
+* major mode for "toon"
+
+toon: https://toonformat.dev/
+
+toon spec is here: https://raw.githubusercontent.com/toon-format/spec/refs/heads/main/SPEC.md
+
+elisp reference manual is here: https://www.gnu.org/software/emacs/manual/elisp.html
+
+
+#+BEGIN_QUOTE
+Token-Oriented Object Notation is a compact, human-readable encoding of the
+JSON data model that minimizes tokens and makes structure easy for models to
+follow.  It's intended for LLM input as a drop-in, lossless representation of
+your existing JSON.
+#+END_QUOTE
