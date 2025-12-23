@@ -22,6 +22,11 @@
   :type 'integer
   :group 'toon)
 
+(defcustom toon-cli-command "toon"
+  "Executable name or path for the TOON CLI."
+  :type 'string
+  :group 'toon)
+
 (defconst toon--identifier-rx "[A-Za-z_][A-Za-z0-9_.]*")
 
 (defvar toon-mode-syntax-table
@@ -103,6 +108,42 @@
         (indent-line-to indent)
       (save-excursion
         (indent-line-to indent)))))
+
+(defun toon--ensure-cli ()
+  "Return the TOON CLI path, or signal a user error."
+  (or (executable-find toon-cli-command)
+      (user-error "TOON CLI not found. Customize `toon-cli-command'")))
+
+(defun toon--call-cli (input &rest args)
+  "Run the TOON CLI with ARGS on INPUT and return stdout as a string."
+  (let ((program (toon--ensure-cli)))
+    (with-temp-buffer
+      (insert input)
+      (let ((exit-code (apply #'call-process-region
+                              (point-min) (point-max)
+                              program
+                              t t nil
+                              args)))
+        (if (zerop exit-code)
+            (buffer-string)
+          (error "TOON CLI failed (%s)" exit-code))))))
+
+(defun toon-convert-buffer-to-json (&optional replace)
+  "Convert current buffer from TOON to JSON using the TOON CLI.
+With prefix arg REPLACE, replace buffer contents."
+  (interactive "P")
+  (let ((json-text (toon--call-cli (buffer-string) "--decode")))
+    (if replace
+        (progn
+          (erase-buffer)
+          (insert json-text))
+      (let ((buf (get-buffer-create "*TOON JSON*")))
+        (with-current-buffer buf
+          (erase-buffer)
+          (insert json-text)
+          (when (fboundp 'json-mode)
+            (json-mode)))
+        (display-buffer buf)))))
 
 ;;;###autoload
 (define-derived-mode toon-mode prog-mode "TOON"

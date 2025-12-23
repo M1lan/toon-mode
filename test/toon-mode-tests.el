@@ -1,4 +1,5 @@
 (require 'ert)
+(require 'json)
 
 (defconst toon-test--root
   (file-name-directory (or load-file-name buffer-file-name)))
@@ -37,3 +38,12 @@
 (ert-deftest toon-font-lock-number ()
   (should (eq (toon-test--face-at "count: 42\n" "42")
               'font-lock-constant-face)))
+
+(ert-deftest toon-cli-decode-basic ()
+  (skip-unless (executable-find "toon"))
+  (let* ((json-object-type 'alist)
+         (json-key-type 'symbol)
+         (json-array-type 'list)
+         (json-text (toon--call-cli "a: 1\n" "--decode"))
+         (data (json-read-from-string json-text)))
+    (should (equal (alist-get 'a data) 1))))
