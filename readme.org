@@ -4,9 +4,11 @@
 
 toon: https://toonformat.dev/
 
-toon spec is here: https://raw.githubusercontent.com/toon-format/spec/refs/heads/main/SPEC.md
+toon spec is here:
+https://raw.githubusercontent.com/toon-format/spec/refs/heads/main/SPEC.md
 
-elisp reference manual is here: https://www.gnu.org/software/emacs/manual/elisp.html
+elisp reference manual is here:
+https://www.gnu.org/software/emacs/manual/elisp.html
 
 * requirements
 
