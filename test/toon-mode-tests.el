@@ -1,3 +1,5 @@
+;;; toon-mode-tests.el -*- lexical-binding: t; -*-
+
 (require 'ert)
 (require 'json)
 
@@ -48,10 +50,9 @@
          (data (json-read-from-string json-text)))
     (should (equal (alist-get 'a data) 1))))
 
-(ert-deftest toon-cli-format-buffer ()
-  (skip-unless (executable-find "toon"))
+(ert-deftest toon-format-buffer-normalizes-spacing ()
   (let* ((toon-indent-offset 4)
-         (input "root:\n  key: 1\n")
+         (input "root:\n    key:1\n")
          (formatted (toon--format-string input)))
     (should (equal formatted "root:\n    key: 1\n"))))
 

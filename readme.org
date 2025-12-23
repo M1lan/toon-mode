@@ -13,7 +13,7 @@ https://www.gnu.org/software/emacs/manual/elisp.html
 * requirements
 
 - Emacs 27+ (for reliable `font-lock-ensure`)
-- `toon` CLI in your PATH (for TOON -> JSON conversion)
+- `toon` CLI in your PATH (only for TOON -> JSON conversion)
 
 * usage
 
@@ -28,7 +28,7 @@ https://www.gnu.org/software/emacs/manual/elisp.html
 - syntax highlighting for keys, constants, and numbers
 - indentation based on block structure
 - convert TOON buffer to JSON via the `toon` CLI
-- pretty-print buffers via the `toon` CLI
+- pretty-print buffers (pure Emacs Lisp; no external dependencies)
 
 
 #+BEGIN_QUOTE
