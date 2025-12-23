@@ -22,6 +22,8 @@
   :type 'integer
   :group 'toon)
 
+(defconst toon--identifier-rx "[A-Za-z_][A-Za-z0-9_.]*")
+
 (defvar toon-mode-syntax-table
   (let ((table (make-syntax-table)))
     ;; Strings
@@ -30,10 +32,10 @@
     
     ;; Punctuation
     (modify-syntax-entry ?: "." table)
-    (modify-syntax-entry ?[ "(]" table)
-    (modify-syntax-entry ?] ")[ " table)
-    (modify-syntax-entry ?{ "(}" table)
-    (modify-syntax-entry ?} "){ " table)
+    (modify-syntax-entry ?\[ "(" table)
+    (modify-syntax-entry ?\] ")" table)
+    (modify-syntax-entry ?\{ "(" table)
+    (modify-syntax-entry ?\} ")" table)
     (modify-syntax-entry ?- "." table)
     
     table)
@@ -42,36 +44,29 @@
 (defvar toon-font-lock-keywords
   (let ((kw-constants '("true" "false" "null")))
     (list
-     ;; Array Headers: key[N] or [N]
-     ;; Highlight the key before bracket
-     `(,(concat "^\s-*\(\(?:[A-Za-z_][A-Za-z0-9_.]*\)\)\s-*\[")
+     ;; Array header key
+     `(,(concat "^\\s-*\\(" toon--identifier-rx "\\)\\s-*\\[")
        1 font-lock-variable-name-face)
-     
-     ;; Highlight the brackets and content [N<delim>]
-     '("\\[\([0-9]+\)\(?:\(\t\|\|\)\)?\\]"
+     ;; Bracketed length and delimiter
+     '("\\[\\([0-9]+\\)\\(?:\\(\\t\\|\\|\\)\\)?\\]"
        (1 font-lock-constant-face)
        (2 font-lock-keyword-face nil t))
-     
-     ;; Highlight the fields list {a,b,c}
-     '("{\([^}]*\)}"
-       1 font-lock-string-face)
-
-     ;; Object Keys (Unquoted)
-     `(,(concat "^\s-*\(\(?:[A-Za-z_][A-Za-z0-9_.]*\)\):")
+     ;; Field list {a,b,c}
+     '("{\\([^}]*\\)}" 1 font-lock-string-face)
+     ;; Object keys (unquoted)
+     `(,(concat "^\\s-*\\(" toon--identifier-rx "\\)\\s-*:") 
        1 font-lock-variable-name-face)
-     
-     ;; Object Keys (Quoted)
-     '("^\s-*\(\"[^\"]+\"\):"
+     ;; Object keys (quoted)
+     '("^\\s-*\\(\"[^\"]+\"\\)\\s-*:"
        1 font-lock-variable-name-face)
-     
-     ;; List markers
-     '("^\s-*\(-\)\s-" 1 font-lock-keyword-face)
-     
-     ;; Constants
-     `(,(concat "\_<" (regexp-opt kw-constants) "\_>")
+     ;; List marker
+     '("^\\s-*\\(-\\)\\s-+" 1 font-lock-keyword-face)
+     ;; Numbers
+     '("\\_<-?[0-9]+\\(?:\\.[0-9]+\\)?\\(?:[eE][+-]?[0-9]+\\)?\\_>"
        0 font-lock-constant-face)
-     
-     ))
+     ;; Constants
+     `(,(concat "\\_<" (regexp-opt kw-constants) "\\_>")
+       0 font-lock-constant-face)))
   "Font lock keywords for `toon-mode'.")
 
 ;; Indentation Logic
@@ -120,7 +115,7 @@
   )
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist '("\.toon\'" . toon-mode))
+(add-to-list 'auto-mode-alist '("\\.toon\\'" . toon-mode))
 
 (provide 'toon-mode)
 ;;; toon-mode.el ends here
