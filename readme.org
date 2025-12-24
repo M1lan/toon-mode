@@ -9,7 +9,6 @@ follow.  It's intended for LLM input as a drop-in, lossless representation of
 your existing JSON.
 #+END_QUOTE
 
-
 toon: https://toonformat.dev/
 
 toon spec is here:
@@ -23,7 +22,18 @@ https://www.gnu.org/software/emacs/manual/elisp.html
 - Emacs 27+ (for reliable `font-lock-ensure`)
 - `toon` CLI in your PATH (only for TOON -> JSON conversion)
 
+
 * usage
+
+** straight.el
+
+#+BEGIN_SRC elisp
+(use-package toon-mode
+  :defer t
+  :straight (toon-mode :type git :host github :repo "m1lan/toon-mode"))
+#+END_SRC
+
+** manual
 
 - load the mode: M-x load-file RET toon-mode.el
 - open a .toon file (auto-mode)
